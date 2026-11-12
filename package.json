@@ -102,7 +102,16 @@
     "test:canvas-workspaces": "node --test tests/canvas-workspaces.test.js",
     "test:ui-canvas-workspaces": "node tests/ui-canvas-workspaces.mjs",
     "test:director-workspaces": "node --test tests/director-workspaces.test.js",
-    "test:ui-director-workspaces": "node tests/ui-director-workspaces.mjs"
+    "test:ui-director-workspaces": "node tests/ui-director-workspaces.mjs",
+    "test:story": "node --test tests/story-workflow.test.js tests/story-ui-contract.test.js tests/story-visuals.test.js",
+    "test:ui-story": "node tests/ui-story.mjs",
+    "test:ui-story-visuals": "node tests/ui-story-visuals.mjs",
+    "test:ui-card-panels": "node tests/ui-card-panels.mjs",
+    "test:ui-guidance-transfer": "node tests/ui-guidance-transfer.mjs",
+    "test:ui-library-tree": "node tests/ui-library-tree.mjs",
+    "test:ui-link-style": "node tests/ui-link-style.mjs",
+    "test:ui-usage-pricing": "node tests/ui-usage-pricing.mjs",
+    "test:ui-usage-variables": "node tests/ui-usage-variables.mjs"
   },
   "engines": {
     "node": ">=24",
