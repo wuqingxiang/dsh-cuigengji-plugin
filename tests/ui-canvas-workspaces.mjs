@@ -1,17 +1,15 @@
 // Real components and RPC, using a disposable synthetic library and no model calls.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile,readFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,selectPlanningPage,moveBatch} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','canvas-workspaces');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const out=await shotDir('canvas-workspaces');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 const checks=[],errors=[];
 try{
- const {url}=await new Promise((resolve,reject)=>{let stdout='',stderr='';const timer=setTimeout(()=>reject(Error(stderr||'Preview timeout')),25000);host.stderr.on('data',part=>stderr+=part);host.once('exit',()=>{clearTimeout(timer);reject(Error(stderr||'Preview stopped'));});host.stdout.on('data',part=>{stdout+=part;const line=stdout.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})}),body=await r.json();if(!r.ok)throw Error(body.error);return body;};
  const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,requestId:crypto.randomUUID(),...args});
  const plan=await run('planning.apply',{operations:[
   {op:'group.create',ref:'root',value:{name:'雨城篇'}},{op:'group.create',ref:'child',value:{name:'调查线',parentId:'root'}},

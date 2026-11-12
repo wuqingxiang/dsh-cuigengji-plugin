@@ -1,22 +1,16 @@
 import {showOrganization,selectSettingsCategory} from './helpers/navigation.mjs';
-import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
-import {mkdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {build} from 'esbuild';
 import {chromium,expect} from '@playwright/test';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'), shots=join(root,'test-results','controls');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const root=resolve(import.meta.dirname,'..');
+const shots=await shotDir('controls');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser, server;
 try {
-  const {url}=await new Promise((resolve,reject)=>{
-    let output=''; const timeout=setTimeout(()=>reject(new Error('Preview timed out')),20000);
-    preview.once('exit',code=>{clearTimeout(timeout);reject(new Error(`Preview exited ${code}`));});
-    preview.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timeout);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw new Error(await r.text());return r.json();};
   const novelId=(await call('novel.list'))[0].id;
   for(let i=0;i<22;i++)await call('graph.group.create',{novelId,name:i===1?'雨城 · 主要人物与势力':i===2?'旧都与南境之间尚未揭示的秘密与人物关系分组':'设定分组 '+String(i+1).padStart(2,'0')});
   browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined});

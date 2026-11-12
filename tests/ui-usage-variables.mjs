@@ -1,16 +1,16 @@
 // Actual workbench components, ephemeral library and synthesized account data.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {selectSettingsCategory} from './helpers/navigation.mjs';
 import {usageDay} from '../src/domain/usage/settings.ts';
 import {observeBalance} from '../src/domain/usage/balance.js';
-const root=resolve(import.meta.dirname,'..'),output=join(root,'test-results/usage-variables');await mkdir(output,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});let browser,page;const checks=[];
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const output=await shotDir('usage-variables');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
+let browser,page;const checks=[];
 try{
-  const {url}=await new Promise((resolve,reject)=>{let log='',err='';const timer=setTimeout(()=>reject(Error(err||'Preview timeout')),25000);host.stderr.on('data',c=>err+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(err));});host.stdout.on('data',c=>{log+=c;const line=log.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const v=await r.json();if(!r.ok)throw Error(v.error);return v;};
   const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,...args});
   const ledger={},time=Date.now();observeBalance(ledger,{balance:10,currency:'CNY',scope:'synthetic',at:time-30000});observeBalance(ledger,{balance:8,currency:'CNY',scope:'synthetic',at:time-10000});
   const legacy={events:Array.from({length:255},(_,i)=>({ts:time-i*1000,tokens:100+i,model:i%2?'synthetic-a':'synthetic-b',cost:.01})),...ledger};

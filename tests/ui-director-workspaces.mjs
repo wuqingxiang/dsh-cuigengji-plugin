@@ -1,16 +1,14 @@
 // Production UI + Store, disposable synthetic data. No desktop control or model calls.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile,readFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,clearCanvasSelection,batchCommand} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','director-workspaces');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const out=await shotDir('director-workspaces');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;const errors=[],checks=[];
 try{
- const {url}=await new Promise((resolve,reject)=>{let stdout='',stderr='';const timer=setTimeout(()=>reject(Error(stderr||'Preview timeout')),25000);host.stderr.on('data',s=>stderr+=s);host.once('exit',()=>{clearTimeout(timer);reject(Error(stderr||'Preview stopped'));});host.stdout.on('data',s=>{stdout+=s;const line=stdout.split('\n').find(s=>s.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})}),body=await r.json();if(!r.ok)throw Error(body.error);return body;};
  const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,requestId:crypto.randomUUID(),...args});
  const old=await run('graph.page.create',{name:'乌坦城',summary:'旧版画布自动变成真实文件夹'}),clan=await run('graph.group.create',{name:'萧家',pageId:old.id}),branch=await run('graph.group.create',{name:'年轻一辈',parentId:clan.id});
  const a=await run('graph.create',{type:'character_card',name:'萧炎',summary:'立下约定的少年',content:'当前人物全文',groupId:branch.id,position:{x:160,y:200}}),b=await run('graph.create',{type:'character_card',name:'萧战',summary:'萧家族长',content:'当前族长全文',groupId:clan.id,position:{x:520,y:200}}),outside=await run('graph.create',{type:'world_entry',name:'云岚宗',summary:'三年约定的山门',content:'外部资源正文',position:{x:1000,y:200}});

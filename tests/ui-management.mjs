@@ -1,23 +1,14 @@
-import {spawn} from 'node:child_process';
-import {mkdir, readFile} from 'node:fs/promises';
-import {resolve, join} from 'node:path';
+import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {chromium, expect} from '@playwright/test';
 import {openAuthorPage} from './helpers/navigation.mjs';
+import {startPreview, dispatchCall, shotDir} from './helpers/preview.mjs';
 
-const root = resolve(import.meta.dirname, '..'), shots = join(root, 'test-results', 'management');
-await mkdir(shots, {recursive: true});
-const preview = spawn(process.execPath, ['scripts/preview-workbench.mjs'], {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
+const shots = await shotDir('management');
+const {url, preview} = await startPreview();
+const call = dispatchCall(url);
 let browser;
 try {
-  const {url} = await new Promise((resolve, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('Preview timeout')), 20000);
-    preview.once('exit', code => {clearTimeout(timer); reject(new Error('Preview exit ' + code));});
-    preview.stdout.on('data', chunk => {output += chunk; const line = output.split('\n').find(line => line.startsWith('{')); if (line) {clearTimeout(timer); resolve(JSON.parse(line));}});
-  });
-  const call = async (action, args = {}) => {
-    const response = await fetch(new URL('/dispatch', url), {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({action, args})});
-    if (!response.ok) throw new Error(await response.text()); return response.json();
-  };
   const novelId = (await call('novel.list'))[0].id;
   const blocks = Array.from({length: 12}, (_, i) => ({identifier: 'block-' + i, name: ['叙事视角', '人物声音', '节奏与留白'][i % 3] + (i > 2 ? ' · 第' + (i + 1) + '条要求' : ''), content: i === 0 ? '保持第三人称有限视角。\n\n只描写人物能看到、听到和推断出的信息。让动作与选择推进情节，避免替读者总结道理。\n\n每个场景有明确的冲突和变化，结尾留下下一步的选择。' : '通过人物的动作与对话呈现信息，避免重复解释。', enabled: true}));
   await call('preset.set', {novelId, expectedRevision: 0, preset: {name: '雨城 · 写作要求', enabled: true, blocks}});

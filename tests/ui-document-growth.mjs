@@ -1,23 +1,16 @@
 // Grow real setting documents one line at a time; prefilling a long body misses caret/scroll regressions.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','document-growth');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('document-growth');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 const samples=[];
 try {
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);
-    host.stderr.on('data',chunk=>errors+=chunk);
-    host.once('exit',code=>{clearTimeout(timer);reject(Error(`Preview exit ${code}: ${errors}`));});
-    host.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!response.ok)throw Error(await response.text());return response.json();};
   const novelId=(await call('novel.list'))[0].id;
   const entries=[];
   for(const type of ['world_entry','character_card'])entries.push(await call('graph.create',{novelId,type,name:type==='world_entry'?'逐行世界设定':'逐行人物设定',content:''}));

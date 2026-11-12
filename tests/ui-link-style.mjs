@@ -1,17 +1,15 @@
 // Real production settings/canvases; all story data lives in a disposable preview.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {selectSettingsCategory} from './helpers/navigation.mjs';
 import {clickWire} from './helpers/graph.mjs';
-const root=resolve(import.meta.dirname,'..'),output=join(root,'test-results/link-style');
-await mkdir(output,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const output=await shotDir('link-style');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;const checks=[];
 try{
-  const {url}=await new Promise((resolve,reject)=>{let log='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',chunk=>errors+=chunk);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',chunk=>{log+=chunk;const line=log.split('\n').find(row=>row.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const value=await response.json();if(!response.ok)throw Error(value.error);return value;};
   const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,...args});
   const specs=[['s','发现密信',0,210],['a','追查寄信人',400,0],['b','保护证人',400,420],['end','码头会合',800,210]],edges=[['s','a'],['s','b'],['a','end'],['b','end']];
   await run('planning.apply',{requestId:crypto.randomUUID(),operations:[...specs.map(([ref,title,x,y])=>({op:'node.create',ref,value:{title,summary:'一条线索与不同选择',position:{x,y}}})),...edges.map(([from,to])=>({op:'edge.create',value:{from,to}}))]});
