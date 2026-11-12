@@ -44,19 +44,23 @@ npm run check:build
 
 | 修改范围 | 主要入口 |
 | --- | --- |
-| 正文编辑、同步和章节顺序 | `test:manuscript`、`test:chapter-order` |
-| 规划、设定与多页操作 | `test:graph`、`test:pages`、`test:ui-director-workspaces` |
+| 正文编辑、同步和章节顺序 | `test:manuscript`、`test:chapter-order`、`test:chapter-studio`、`test:manuscript-search` |
+| 章节工作室与文档编辑细节 | `test:ui-chapter-studio`、`test:document-editing`、`test:document-growth` |
+| 规划、设定与多页操作 | `test:graph`、`test:pages`、`test:folders`、`test:ui-folders` |
+| 画布输入、连线与可读性 | `test:ui-canvas-input`、`test:ui-canvas-junctions`、`test:readable-canvas`、`test:ui-readable-canvas`、`test:content-order`、`test:ui-content-order` |
+| 画布多工作区与导演视图 | `test:canvas-workspaces`、`test:ui-canvas-workspaces`、`test:director-workspaces`、`test:ui-director-workspaces` |
 | 创作工作台（简报、章节、线索、审稿、卷纲、体检、节奏、文风） | `test:story`、`test:ui-story`、`test:ui-story-visuals` |
-| 嵌套目录与拖拽排序 | `test:ui-folders`、`test:ui-content-order` |
 | 正文查找与替换 | `test:manuscript-search`、`test:ui-manuscript-search` |
-| 桌宠、日期统计和会话范围 | `test:pet`、`test:records`、`test:session-access` |
-| 目录与工作台导航 | `test:directory`、`test:navigation` |
+| 桌宠、日期统计和会话范围 | `test:pet`、`test:ui-pet`、`test:ui-pet-quick`、`test:records`、`test:ui-records`、`test:session-access` |
+| 目录与工作台导航 | `test:directory`、`test:navigation`、`test:ui-root-directory`、`test:ui-directory-review`、`test:ui-history-routing`、`test:ui`、`test:ui-startup`、`test:startup`、`test:ui-recovery` |
 | 作品管理、欢迎页与回收站 | `test:management`、`test:welcome-batch`、`test:novel-recycle` |
 | 写作预设、导入导出 | `test:presets`、`test:transfer`、`test:ui-library-tree` |
 | 用量账本与剧情变量 | `test:ui-usage-pricing`、`test:ui-usage-variables` |
-| 画布连线样式、卡片对比与指引开关 | `test:ui-link-style`、`test:ui-card-panels`、`test:ui-guidance-transfer` |
-| 完整作者操作流程 | `test:author-workflow` |
+| 画布连线样式、卡片对比与指引开关 | `test:ui-link-style`、`test:ui-card-panels`、`test:ui-guidance-transfer`、`test:host`（宿主兼容） |
+| 工作台布局与整体协作流 | `test:layout`、`test:workspace`、`test:workspace-refinements`、`test:author-workflow` |
+| 数据清理与历史 | `test:cleanup`、`test:ui-cleanup` |
 | 旧库升级 | `test:upgrade` |
+| 发布安装与宿主验收（维护者，见下文数据兼容节） | `test:release`、`test:host-compat`、`test:host` |
 
 以上入口通过 `npm run <入口>` 执行，界面脚本需要 Playwright 浏览器。`test:review-ui` 汇总执行主要流程，也可在 `--` 后指定流程名；检查失败需查看对应日志，不只看汇总数量。测试代码与合成 fixture 保留在公开仓库，验收输出和截图存入被忽略的临时目录。
 
