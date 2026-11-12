@@ -1,17 +1,15 @@
 // Production components and a persisted disposable library. No desktop profile.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','cleanup');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const out=await shotDir('cleanup');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try{
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await r.json();if(!r.ok)throw Error(result.error);return result;};
   const novelId=(await call('novel.list'))[0].id,chapter=(await call('chapter.list',{novelId}))[0];
   for(let revision=1;revision<5;revision++)await call('chapter.update',{novelId,chapterId:chapter.id,expectedRevision:revision,content:`正文修订 v${revision+1}，当年的信重新被打开。`});
   const node=await call('graph.create',{novelId,type:'character_card',name:'送信人',content:'设定第一稿',status:'stale',sources:[{chapterId:chapter.id,revision:2}]});

@@ -1,15 +1,13 @@
 import {selectSettingsCategory} from './helpers/navigation.mjs';
-import {spawn} from 'node:child_process';
-import {mkdir,readFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','guidance-transfer');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs','--welcome'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('guidance-transfer');
+const {url,preview:host}=await startPreview(['--welcome']);
+const call=dispatchCall(url);
 let browser;
 try {
- const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw Error(await r.text());return r.json();};
  const first=(await call('novel.list'))[0],second=await call('novel.create',{title:'尚未打开的第二部作品'});
  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:900,height:850}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);

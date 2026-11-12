@@ -1,15 +1,12 @@
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
 import {clickWire} from './helpers/graph.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','readable-canvas');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('readable-canvas');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try{
- const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(new Error('Preview timeout '+errors)),20000);preview.stderr.on('data',v=>errors+=v);preview.once('exit',code=>reject(new Error('Preview exited '+code+errors)));preview.stdout.on('data',v=>{output+=v;const line=output.split('\n').find(s=>s.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})}),value=await r.json();if(!r.ok)throw new Error(value.error);return value;};
  const novelId=(await call('novel.list'))[0].id;
  const tx=await call('planning.apply',{novelId,requestId:crypto.randomUUID(),operations:[
   {op:'group.create',ref:'folder',value:{name:'主角行动'}},

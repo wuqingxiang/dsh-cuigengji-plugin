@@ -1,16 +1,14 @@
 // Production UI + persistent Store; disposable synthetic library, no desktop profile or model calls.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','card-panels');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const out=await shotDir('card-panels');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try {
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw Error(await r.text());return r.json();};
   const novelId=(await call('novel.list'))[0].id;
   const original='雨夜来信😀\n她尚未查明寄信人。\n准备出发。',latest='晴日来信😀\n她已经查明寄信人。\n决定留下证据。';
   const parent=await call('graph.group.create',{novelId,name:'人物资源'}),child=await call('graph.group.create',{novelId,name:'云海城',parentId:parent.id});

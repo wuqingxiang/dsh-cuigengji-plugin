@@ -1,21 +1,13 @@
 // Direct manipulation against the shipped components and an isolated real Store.
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
 import {clickWire} from './helpers/graph.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','graph');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('graph');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try {
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(new Error('Preview timeout: '+errors)),20000);
-    preview.stderr.on('data',v=>errors+=v);
-    preview.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exited '+code+': '+errors));});
-    preview.stdout.on('data',v=>{output+=v;const line=output.split('\n').find(v=>v.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await r.json();if(!r.ok)throw new Error(result.error);return result;};
   const novelId=(await call('novel.list'))[0].id;
   const group=await call('graph.group.create',{novelId,name:'雨城'});
   const names=['雨夜来客','城南书铺','直到最后一封信到来才揭开的旧城真相'.repeat(4)],memory=[];

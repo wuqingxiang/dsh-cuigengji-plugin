@@ -1,24 +1,19 @@
 // Actual components and persistence; every account and call is synthetic and offline.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {UsageService} from '../src/application/usage/service.ts';
 import {usageDay} from '../src/domain/usage/settings.ts';
 import {selectSettingsCategory} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),output=join(root,'test-results/usage-pricing');
-await mkdir(output,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const output=await shotDir('usage-pricing');
+const {url,dataDirectory,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page,ledger;
 const checks=[];
 try{
-  const {url,dataDirectory}=await new Promise((resolve,reject)=>{
-    let log='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);
-    host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});
-    host.stdout.on('data',c=>{log+=c;const line=log.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const data=await r.json();if(!r.ok)throw Error(data.error);return data;};
+  ledger=new UsageService(join(dataDirectory,'usage'));
   ledger=new UsageService(join(dataDirectory,'usage'));
   const config=await ledger.configuration(),today=usageDay();
   await ledger.configure({expectedRevision:config.revision,sources:[{...config.sources[0],enabled:false,name:'DeepSeek 官方'},{id:'router',name:'自定义 API',template:'custom',enabled:false,keyRef:'',currency:'USD'},{id:'codex',name:'Codex 本机',template:'codex',enabled:false,keyRef:'',currency:'USD'}]});

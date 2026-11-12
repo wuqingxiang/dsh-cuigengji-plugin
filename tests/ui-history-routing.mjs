@@ -1,16 +1,14 @@
 // Real UI, persisted synthetic data, no user profile and no model requests.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile,readFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','history-routing');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('history-routing');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try {
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw Error(await r.text());return r.json();};
   const novelId=(await call('novel.list'))[0].id;
   const original='# 最初的约定\n\n她还不知道来信出自谁手。\n\n- 一封缺页的信\n- 一段尚未证实的往事';
   const latest='# 选择与代价\n\n她已经查明寄信人，但还没有告诉同行的人。\n\n## 当前动机\n\n保护同行者，同时调查旧港失踪的账本。\n\n> 等天亮了，再说给你听。\n\n- 知道：账本曾被调包\n- 未知：谁在暗中传递消息';

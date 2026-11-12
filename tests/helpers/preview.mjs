@@ -14,10 +14,10 @@ const root = resolve(import.meta.dirname, '..', '..');
 /** Start the preview and resolve once its stdout prints the ready JSON line.
  * @param {string[]} args extra argv for scripts/preview-workbench.mjs (e.g. ['--story-demo'])
  * @param {{timeoutMs?: number}} options
- * @returns {Promise<{url: string, preview: import('node:child_process').ChildProcess, root: string}>} */
+ * @returns {Promise<{url: string, dataDirectory: string, preview: import('node:child_process').ChildProcess, root: string}>} */
 export async function startPreview(args = [], {timeoutMs = 30000} = {}) {
   const preview = spawn(process.execPath, ['scripts/preview-workbench.mjs', ...args], {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
-  const {url} = await new Promise((done, reject) => {
+  const ready = await new Promise((done, reject) => {
     let output = '', errors = '';
     const timeout = setTimeout(() => reject(new Error(errors || `Preview was not ready within ${timeoutMs}ms`)), timeoutMs);
     preview.stderr.on('data', chunk => {errors += chunk;});
@@ -28,7 +28,7 @@ export async function startPreview(args = [], {timeoutMs = 30000} = {}) {
       if (line) {clearTimeout(timeout); done(JSON.parse(line));}
     });
   });
-  return {url, preview, root};
+  return {url: ready.url, dataDirectory: ready.dataDirectory, preview, root};
 }
 
 /** A dispatch caller bound to the preview URL; throws the server's message. */

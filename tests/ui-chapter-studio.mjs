@@ -1,15 +1,13 @@
 // Production frontend + persisted synthetic library. No user profile or model calls.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','chapter-studio');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const out=await shotDir('chapter-studio');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try{
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw Error(await r.text());return r.json();};
   const novelId=(await call('novel.list'))[0].id,a=(await call('chapter.list',{novelId}))[0];
   const original=['第一行：雨夜来信。','她推开门，走进旧港。','第三行未变。','她在桌前犹豫了很久。','第五行未变。',...Array.from({length:90},(_,i)=>`第${i+6}行。${'她将来信放好，点亮窗边的灯。'.repeat(i%3+1)}`)].join('\n');
   await call('chapter.update',{novelId,chapterId:a.id,expectedRevision:a.revision,content:original});

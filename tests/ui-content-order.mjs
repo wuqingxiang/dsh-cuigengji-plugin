@@ -1,17 +1,15 @@
 // Real UI + disposable persistence. No desktop profile or model requests.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,moveBatch} from './helpers/navigation.mjs';
 import {directorySnapshot} from '../src/domain/directory/order.ts';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results/content-order');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('content-order');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;const requests=[],checks=[];
 try{
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',part=>errors+=part);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',part=>{output+=part;const line=output.split('\n').find(row=>row.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})}),result=await response.json();if(!response.ok)throw Error(result.error);return result;};
   const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,...args});
   const tx=await run('planning.apply',{requestId:crypto.randomUUID(),operations:[
     {op:'group.create',ref:'group',value:{name:'剧情'}},{op:'group.create',ref:'other',value:{name:'后续剧情'}},

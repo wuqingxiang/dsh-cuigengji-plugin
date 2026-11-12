@@ -1,26 +1,15 @@
 // Exercise the shipped planning/settings canvases with isolated synthetic data.
 // Wheel replay covers trackpad event signatures, not physical macOS hardware.
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
 import {selectSettingsCategory} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','canvas-input');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('canvas-input');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try{
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(new Error('Preview timeout: '+errors)),20000);
-    preview.stderr.on('data',v=>errors+=v);
-    preview.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exited '+code+': '+errors));});
-    preview.stdout.on('data',v=>{output+=v;const line=output.split('\n').find(v=>v.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{
-    const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});
-    const result=await response.json();if(!response.ok)throw new Error(result.error);return result;
-  };
   const novelId=(await call('novel.list'))[0].id;
   for(const [i,title] of ['收到来信','前往旧城'].entries()){
     const position={x:80+i*360,y:100+i*120};

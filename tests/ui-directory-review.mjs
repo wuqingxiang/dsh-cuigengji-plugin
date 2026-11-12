@@ -1,25 +1,16 @@
 // Author workflows against the production UI and disposable persistence only.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,selectPlanningPage} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),out=join(root,'test-results','directory-review');
-await mkdir(out,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const out=await shotDir('directory-review');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 const checks=[],errors=[],requests=[];
 let browser,page;
 try{
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);
-    host.stderr.on('data',part=>errors+=part);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});
-    host.stdout.on('data',part=>{output+=part;const line=output.split('\n').find(row=>row.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{
-    const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});
-    const result=await response.json();if(!response.ok)throw Error(result.error);return result;
-  };
   const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,...args});
   const tx=await run('planning.apply',{requestId:crypto.randomUUID(),operations:[
     {op:'group.create',ref:'root',value:{name:'开篇整理'}},
@@ -90,7 +81,9 @@ try{
   const selectedView=await canvasSnapshot();
   await entry(ids.evidence).getByRole('button',{name:'选中 出示凭据',exact:true}).dblclick();
   await expect(page.locator('.planning-detail')).toContainText('原始的详细情节');await expect(page.locator('.organized-workspace')).toHaveAttribute('data-detail','side');
-  await expect(page.locator('.workspace-sidebar')).toBeHidden();await expect(page.locator('.workspace-detail-size')).toHaveCount(0);
+  // In side-detail mode (0.6) the canvas leaves the layout; the directory
+  // sidebar stays mounted (it may close itself on narrow widths only).
+  await expect(page.locator('.workspace-detail-size')).toHaveCount(0);
   await button('编辑规划').click();await page.getByRole('textbox',{name:'正文',exact:true}).fill('保留的编辑草稿');
   await button('‹ 返回规划').click();await expect(page.locator('.planning-detail')).toHaveCount(0);
   await expect(page.locator('.planning-overview')).not.toContainText('已返回画布');await expect.poll(canvasSnapshot).toEqual(selectedView);

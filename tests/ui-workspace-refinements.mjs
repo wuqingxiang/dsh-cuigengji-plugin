@@ -1,16 +1,14 @@
 // Shipped UI and real Store, isolated synthetic data. No desktop profile or model calls.
-import {spawn} from 'node:child_process';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {readFile,writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,selectSettingsCategory} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','workspace-refinements');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs','--canvas-demo'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('workspace-refinements');
+const {url,preview:host}=await startPreview(['--canvas-demo']);
+const call=dispatchCall(url);
 let browser,page;
 try {
- const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',c=>errors+=c);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',c=>{output+=c;const line=output.split('\n').find(l=>l.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw Error(await r.text());return r.json();};
  const novel=(await call('novel.list'))[0],novelId=novel.id;
  const nodes=(await call('planning.list',{novelId,pageId:null})).items,nodeId=nodes[0].id;
  const getPlan=async()=> (await call('planning.get',{novelId,nodeId})).node;
