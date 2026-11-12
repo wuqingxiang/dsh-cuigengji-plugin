@@ -68,3 +68,10 @@ test('docs reference only existing images, and feature screenshots stay out of t
     .filter(name => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name) && !referenced.has(`docs/screenshots/${name}`));
   assert.deepEqual(stray, [], 'unreferenced images in docs/screenshots are promo material; move them to .github/assets');
 });
+
+test('every public doc under docs/ is reachable from docs/README.md (AGENTS.md entry-point rule)', async () => {
+  const index = await readFile(join(root, 'docs', 'README.md'), 'utf8');
+  const orphans = (await readdir(join(root, 'docs')).catch(() => []))
+    .filter(f => f.endsWith('.md') && f !== 'README.md' && !index.includes(f));
+  assert.deepEqual(orphans, [], 'new public docs must be listed in docs/README.md');
+});
