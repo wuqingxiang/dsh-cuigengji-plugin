@@ -17,9 +17,21 @@ export function ReferenceBoard({snapshot, onChapter, call, reload, save, busy}: 
   const references = Object.values(snapshot.story.references);
   const selected = references.find(item => item.id === stored) || references[0] || null;
   const [path, setPath] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(false), [picking, setPicking] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // The host's native picker returns null in hosts without the capability; the
+  // path field stays editable either way.
+  const pick = async () => {
+    if (picking || busy || importing) return;
+    setPicking(true); setError('');
+    try {
+      const value = await call('library.pick', {});
+      if (value?.path) setPath(value.path);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally { setPicking(false); }
+  };
   const runImport = async () => {
     const trimmed = path.trim();
     if (!trimmed || importing) { if (!trimmed) setError('请填写拆文库文件夹路径'); return; }
@@ -42,7 +54,8 @@ export function ReferenceBoard({snapshot, onChapter, call, reload, save, busy}: 
   return <section className="story-reference-workspace" aria-label="拆文库与对标">
     <div className="story-section-heading"><div><h2>把拆文库变成可以对照的对标书</h2><p>导入后保存的是本书内的副本，原拆文库不动；对标报告、文风、节奏与情绪模块都从分析文件读取。</p></div><Badge tone={references.length ? 'success' : 'idle'}>{references.length ? `${references.length} 本对标书` : '尚未导入'}</Badge></div>
     <div className="story-reference-import">
-      <label className="story-inline-field story-reference-path">拆文库文件夹<input value={path} onChange={event => setPath(event.target.value)} placeholder="例如：D:\\hermes\\拆文库\\书名" spellCheck={false}/></label>
+      <label className="story-inline-field story-reference-path">拆文库文件夹<input value={path} onChange={event => setPath(event.target.value)} placeholder="选择文件夹，或输入完整路径" spellCheck={false}/></label>
+      <button disabled={busy || picking || importing} onClick={() => void pick()}>{picking ? '选择中…' : '浏览…'}</button>
       <button disabled={busy || importing} onClick={() => void runImport()}>{importing ? '正在读取…' : '导入对标书'}</button>
       <span className="story-muted">支持「拆文库/书名」文件夹（章节/*_摘要.md、文风.md、剧情/节奏.md、剧情/情绪模块.md、拆文报告.md）</span>
     </div>

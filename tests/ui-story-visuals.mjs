@@ -32,6 +32,8 @@ try{
   // 2. Detector board: real candidates with jump targets, no score anywhere.
   await page.getByRole('button',{name:'去 AI 味体检',exact:true}).click();
   await expect(page.getByText(/候选/).first()).toBeVisible();
+  // Wait for the host scan; the per-chapter heat cells are the settled result.
+  await expect(page.locator('.story-detect-heat-cell .story-detect-heat-count').filter({hasText:'4 条'})).toBeVisible();
   const tiles=page.locator('[class*="story-detect"]').filter({hasText:/条|干净/});
   expect(await tiles.count()).toBeGreaterThan(0);
   await expect(page.getByText(/不是评分|不是分数/).first()).toBeVisible();

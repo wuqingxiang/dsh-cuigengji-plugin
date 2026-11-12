@@ -73,6 +73,7 @@ test('the four visual additions read real data and never invent a score', async 
   assert.match(reference, /story\.reference\.import/, 'reference import must call the host action');
   assert.match(reference, /reference\.remove/, 'removing a project reference must be possible');
   assert.match(reference, /对标节奏对照/, 'the reference rhythm comparison must be visible');
+  assert.match(reference, /library\.pick/, 'importing must offer the native folder picker besides the editable path');
 });
 
 test('story writes use the atomic apply path with a version and request identity', async () => {
