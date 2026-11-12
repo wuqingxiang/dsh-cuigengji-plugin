@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, readFile, writeFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, writeFile, rm, realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join, resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {Store} from '../src/application/store.js';
 import {apply} from '../src/index.js';
@@ -36,7 +36,15 @@ for(const optionalServices of [false,true])test(`native Cordis activates the bac
     assert.deepEqual(await call('library.pick'),optionalServices?{path:join(parent,'selected'),manual:false}:{path:null,manual:true});
     if(optionalServices){
       const target=join(parent,'new-library');await call('library.change',{mode:'create',path:target,confirm:true});
-      assert.equal(edits.length,1);assert.equal(edits[0].dataRoot,target);assert.equal((await call('settings.get')).dataRoot,target);
+      // Windows may report the temp dir through its 8.3 short form; compare
+      // the real paths on disk, which resolves either spelling to the same dir.
+      const samePath=async(a,b)=>{
+        const [left,right]=await Promise.all([realpath(a),realpath(b)]).catch(()=>[resolve(a),resolve(b)]);
+        return left===right||(process.platform==='win32'&&left.toLowerCase()===right.toLowerCase());
+      };
+      assert.equal(edits.length,1);assert.ok(await samePath(edits[0].dataRoot,target),`${edits[0].dataRoot} !== ${target}`);
+      const active=(await call('settings.get')).dataRoot;
+      assert.ok(await samePath(active,target),`${active} !== ${target}`);
     }
   }finally{await ctx.fiber.dispose();await rm(parent,{recursive:true,force:true});}
 });

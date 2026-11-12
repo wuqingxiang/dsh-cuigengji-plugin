@@ -35,7 +35,8 @@ try {
   await page.goto(url);await page.locator('.chapter-item').first().click();
   await expect(page.getByLabel('绑定小说',{exact:true})).toHaveCount(0);
   await expect(page.getByLabel('作品操作',{exact:true})).toHaveCount(0);
-  await expect(page.getByRole('navigation',{name:'小说功能'}).getByRole('button')).toHaveCount(3);
+  await expect(page.getByRole('navigation',{name:'小说功能'}).getByRole('button')).toHaveCount(4);
+  await expect(page.getByRole('button',{name:'创作',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'写作预设',exact:true})).toHaveCount(0);
   const manuscript=page.getByLabel('正文',{exact:true}),scroll=page.locator('.editor-scroll');
   await expect(manuscript).toHaveValue(prose);

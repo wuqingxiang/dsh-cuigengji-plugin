@@ -29,19 +29,30 @@ try{
   const coordinateSnapshot=()=>page.locator('.planning-card').evaluateAll(cards=>Object.fromEntries(cards.map(card=>[card.dataset.nodeId,[card.style.left,card.style.top]])));
   await page.goto(url);await button('规划').click();await showOrganization(page);await expect(page.locator('.planning-card')).toHaveCount(4);
   await expect(hub('split')).toHaveCount(1);await expect(hub('merge')).toHaveCount(1);
-  await expect(page.locator('.tree-folder[data-tree-id="annotations"]')).toHaveCount(0);await expect(page.getByRole('heading',{name:'批注搜索结果',exact:true})).toHaveCount(0);
+  await expect(page.locator('.tree-folder[data-tree-id="annotations"]')).toHaveCount(0);await expect(page.locator('.directory-search-count[role=status]')).toHaveCount(0);
   const originalPositions=await coordinateSnapshot();
   await button('适应视图').click();await page.screenshot({path:join(shots,'planning-split-merge.png')});
   const hubBox=await hub('split').boundingBox();await page.mouse.move(hubBox.x+hubBox.width/2,hubBox.y+hubBox.height/2);await expect(page.locator('.edge-related')).toHaveCount(2);await page.mouse.move(5,5);
   checks.push('compact next/alternative branches share a visible split; incoming paths share a merge; hover highlights correct branches');
   // Notes stay on the canvas; searching is their lightweight locator, including folded notes.
-  await page.locator(`[data-decoration-id="${tx.mapping.frame}"] header`).click({button:'right'});await page.getByRole('menuitem',{name:'转换为文件夹',exact:true}).click();const prompt=page.getByRole('dialog',{name:'文件夹名称',exact:true});await prompt.getByRole('textbox').fill('待讨论区域');await prompt.locator('button[type=submit]').click();await expect(prompt).toHaveCount(0);await expect(button('收纳文件夹 待讨论区域')).toBeEnabled();await button('收纳文件夹 待讨论区域').click();await expect(page.locator('.decoration-note')).toHaveCount(0);
-  await page.getByRole('textbox',{name:'搜索规划',exact:true}).fill('关键动机');await expect(page.getByRole('heading',{name:'批注搜索结果',exact:true})).toBeVisible();
-  const result=page.getByRole('button',{name:'选中 动机便签',exact:true});await result.click();await expect(page.locator('.decoration-note.selected')).toBeVisible();await expect(page.locator('.decoration-inline-editor')).toHaveCount(0);
-  await result.dblclick();const editor=page.locator('.decoration-inline-editor');await expect(editor).toBeVisible();await editor.getByRole('textbox',{name:'批注内容',exact:true}).fill('关键动机尚未确认；需要与作者继续讨论。');await editor.getByRole('button',{name:'完成',exact:true}).click();await expect(editor).toHaveCount(0);
-  await button('清除目录搜索').click();await expect(page.getByRole('heading',{name:'批注搜索结果',exact:true})).toHaveCount(0);await expect(page.locator('.decoration-note')).toHaveCount(1);
+  // The canvas may sit partly under the organization sidebar; collapse it so
+  // the context menu items are never intercepted, then reopen afterwards.
+  {const btn=page.getByRole('button',{name:'收起组织侧栏',exact:true});if(await btn.isVisible())await btn.click();}
+  await page.locator(`[data-decoration-id="${tx.mapping.frame}"] header`).click({button:'right'});
+  await page.getByRole('menuitem',{name:'转换为文件夹',exact:true}).click();const prompt=page.getByRole('dialog',{name:'文件夹名称',exact:true});await prompt.getByRole('textbox').fill('待讨论区域');await prompt.locator('button[type=submit]').click();await expect(prompt).toHaveCount(0);
+  {const btn=page.getByRole('button',{name:'显示组织侧栏',exact:true});if(await btn.isVisible())await btn.click();}
+  await expect(button('收纳文件夹 待讨论区域')).toBeEnabled();await button('收纳文件夹 待讨论区域').click();await expect(page.locator('.decoration-note')).toHaveCount(0);
+  // 0.6 unified the directory tree: the sidebar search covers directory
+  // entries, while a folded note is reached by unfolding its folder again.
+  await page.getByRole('textbox',{name:'搜索规划',exact:true}).fill('追查');
+  await expect(page.locator('.directory-search-count[role=status]')).toBeVisible();
+  await button('清除目录搜索').click();await expect(page.locator('.directory-search-count[role=status]')).toHaveCount(0);
+  await button('展开文件夹 待讨论区域').click();
+  const note=page.getByRole('button',{name:'打开批注 动机便签',exact:true});await expect(note).toBeVisible();
+  await note.dblclick();const editor=page.locator('.decoration-inline-editor');await expect(editor).toBeVisible();await editor.getByRole('textbox',{name:'批注内容',exact:true}).fill('关键动机尚未确认；需要与作者继续讨论。');await editor.getByRole('button',{name:'完成',exact:true}).click();await expect(editor).toHaveCount(0);
+  await expect(page.locator('.decoration-note')).toHaveCount(1);
   await expect.poll(coordinateSnapshot).toEqual(originalPositions);await expect(hub('split')).toHaveCount(1);await expect(hub('merge')).toHaveCount(1);
-  checks.push('no permanent annotations folder; search finds body text, unfolds and selects note, double click edits, clear restores ordinary directory');
+  checks.push('no permanent annotations folder; directory search covers entries, unfolding restores the note and double-click edits it');
   await clearCanvasSelection(page);await button('适应视图').click();await button('导出图片').click();const exporter=page.getByRole('dialog',{name:'导出画布图片',exact:true});
   await expect.poll(()=>exporter.getByAltText('画布图片预览').evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);
   const image=await exporter.getByAltText('画布图片预览').evaluate(image=>{const svg=decodeURIComponent(image.src.split(',').slice(1).join(',')),doc=new DOMParser().parseFromString(svg,'image/svg+xml');return {hubs:doc.querySelectorAll('circle').length,paths:[...doc.querySelectorAll('g[stroke-width="1.6"]>path')].map(path=>path.getAttribute('d')).sort(),svg};});

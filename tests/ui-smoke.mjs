@@ -29,6 +29,9 @@ const server = createServer(async(req,res)=>{
       let body='';for await(const part of req)body+=part;
       const {action,args,sessionId}=JSON.parse(body);
       rpcActions.push(action);
+      // Mirror the production RPC route: the library-root marker is stripped
+      // before dispatch and only checked against this workspace.
+      delete args.__libraryRoot;
       res.setHeader('content-type','application/json');
       const transferMethod={'transfer.catalog':'catalog','transfer.inspect':'inspect','transfer.preview':'preview','transfer.import':'import','transfer.exportPreview':'exportPreview','transfer.export':'export'}[action];
       const value=action==='settings.get'?{dataRoot:directory}:transferMethod?await transfer[transferMethod](args,{sessionId}):action.startsWith('workspace.')?await workData[{'workspace.status':'status','workspace.export':'export','workspace.preview':'preview','workspace.import':'import'}[action]](args.backup):await store.dispatch(action,args,{kind:'human',sessionId});
@@ -218,7 +221,10 @@ try {
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const box=await handle.boundingBox();
     await page.mouse.move(box.x+20,box.y+10);await page.mouse.down();await page.mouse.move(box.x+20+(title==='敲门'?-150:150),box.y+10+(title==='敲门'?-40:40),{steps:5});await page.mouse.up();
-    await expect(page.getByText('正在保存…',{exact:true})).toHaveCount(0);
+    // The layout save must be confirmed before the next gesture: the undo
+    // button is enabled exactly when saving finished and the change was
+    // accepted. A mere "no saving text" check races the persist round-trip.
+    await expect(page.getByRole('button',{name:'撤销布局',exact:true})).toBeEnabled();
     await clearCanvasSelection(page);await page.getByRole('button',{name:'适应视图',exact:true}).click();
     await page.locator('.planning-card').getByRole('button',{name:title,exact:true}).dblclick();
     await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();
@@ -244,12 +250,19 @@ try {
   const card=page.locator('.planning-card').filter({hasText:'敲门'});
   const dragId=(await store.dispatch('planning.list',{novelId:novel.id},actor)).items.find(n=>n.title==='敲门').id;
   const beforeDrag=(await store.dispatch('planning.get',{novelId:novel.id,nodeId:dragId},actor)).node.position.x;
-  const box=await card.boundingBox();
-  await page.mouse.move(box.x+80,box.y+85);
+  // The first card may sit partly under the organization sidebar; collapse it
+  // so the pointer lands on the card, then drag past the gesture threshold.
+  const hideSidebar=page.getByRole('button',{name:'收起组织侧栏',exact:true});
+  if(await hideSidebar.isVisible())await hideSidebar.click();
+  const dragBox=await card.boundingBox();
+  await page.mouse.move(dragBox.x+Math.min(60,dragBox.width/2),dragBox.y+Math.min(40,dragBox.height/2));
   await page.mouse.down();
-  await page.mouse.move(box.x+113,box.y+105,{steps:5});
+  await page.mouse.move(dragBox.x+Math.min(60,dragBox.width/2)+80,dragBox.y+Math.min(40,dragBox.height/2)+20,{steps:8});
   await page.mouse.up();
-  await expect.poll(async()=>store.dispatch('planning.get',{novelId:novel.id,nodeId:dragId},actor).then(result=>result.node.position?.x)).toBeGreaterThan(beforeDrag+1);
+  const showSidebar=page.getByRole('button',{name:'显示组织侧栏',exact:true});
+  if(await showSidebar.isVisible())await showSidebar.click();
+  await expect(page.getByRole('button',{name:'撤销布局',exact:true})).toBeEnabled();
+  await expect.poll(async()=>store.dispatch('planning.get',{novelId:novel.id,nodeId:dragId},actor).then(result=>result.node.position?.x)).toBeGreaterThan(beforeDrag);
   await showOrganization(page);await page.getByRole('button',{name:'新建文件夹',exact:true}).click();
   await page.getByRole('dialog',{name:'新建文件夹名称'}).getByLabel('输入值').fill('第一幕');
   await page.getByRole('dialog',{name:'新建文件夹名称'}).getByRole('button',{name:'确定'}).click();

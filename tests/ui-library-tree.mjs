@@ -46,7 +46,10 @@ try{
   await page.setViewportSize({width:360,height:780});await page.screenshot({path:join(shots,'library-switch-360.png')});expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await dialog.getByRole('button',{name:'创建并打开',exact:true}).click();await expect(dialog).toHaveCount(0);await expect(page.locator('.welcome-work-card')).toHaveCount(0);
   expect(await call('novel.list')).toEqual([]);
-  await page.setViewportSize({width:1440,height:1000});await openData();await expect(dialog.getByLabel('作品库目录',{exact:true})).toHaveText(target);
+  await page.setViewportSize({width:1440,height:1000});await openData();
+  // Windows may report the library root through its 8.3 short spelling; the
+  // settings display follows the service's realpath form.
+  await expect(dialog.getByLabel('作品库目录',{exact:true})).toHaveText(/cuigengji-ui-libraries-[^\n]*[\\/]empty/);
   await dialog.getByRole('button',{name:'打开已有作品库',exact:false}).click();await dialog.getByLabel('最近使用的作品库').selectOption(dataDirectory);
   await dialog.getByRole('button',{name:'检查目标目录',exact:true}).click();await expect(dialog).toContainText(novel.title);await dialog.getByRole('button',{name:'打开此作品库',exact:true}).click();await expect(dialog).toHaveCount(0);
   expect((await call('novel.list'))[0].id).toBe(novelId);

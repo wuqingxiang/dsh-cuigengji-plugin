@@ -25,7 +25,10 @@ try {
   await call('chapter.delete',{novelId,chapterId:trash.id,expectedRevision:trash.revision,confirm:true});
   browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1250,height:920},reducedMotion:'reduce'});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
-  await page.goto(url);await page.locator('.chapter-item').first().click();
+  await page.goto(url);
+  // The chapter directory lists newest-first by default (0.6); open the
+  // seeded long chapter by its position in chapter.list, matched by title.
+  await page.locator('.chapter-item').filter({hasText:a.title}).first().click();
   let prose=page.getByLabel('正文',{exact:true});
   const panel=page.getByRole('dialog',{name:'正文查找与替换'}),query=page.getByRole('textbox',{name:'正文查找内容'}),replacement=page.getByRole('textbox',{name:'正文替换为'});
   const scope=page.getByRole('combobox',{name:'正文查找范围'});

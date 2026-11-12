@@ -33,8 +33,11 @@ try{
  await expect(selectedPlanningPage(page)).toContainText('港口篇');await expect(page.locator('.planning-card')).toHaveCount(0);
  const pageId=(await call('planning.pages',{novelId})).find(p=>p.name==='港口篇').id;
  const canvas=page.locator('.planning-canvas-scroll');
- const context=async(x=80,y=85)=>{await expect(page.getByRole('button',{name:'＋ 情节',exact:true})).toBeEnabled();await expect(page.locator('.graph-status [role=status]')).toHaveCount(0);await canvas.click({button:'right',position:{x,y}});await expect(page.getByRole('menu',{name:'画布操作'})).toBeVisible();};
- await context();await page.getByRole('menuitem',{name:'新建情节',exact:true}).click();await page.getByLabel('情节标题',{exact:true}).fill('抵达港口');await page.getByLabel('情节摘要',{exact:true}).fill('独立新情节');await page.locator('.canvas-draft').getByRole('button',{name:'创建',exact:true}).click();
+  // The organization sidebar overlays the canvas stage in 0.6; collapse it
+  // before canvas-context gestures so the click is never intercepted.
+  const hideSidebarIfOpen=async()=>{const btn=page.getByRole('button',{name:'收起组织侧栏',exact:true});if(await btn.isVisible())await btn.click();};
+  const context=async(x=80,y=85)=>{await hideSidebarIfOpen();await expect(page.getByRole('button',{name:'＋ 情节',exact:true})).toBeEnabled();await expect(page.locator('.graph-status [role=status]')).toHaveCount(0);await canvas.click({button:'right',position:{x,y}});await expect(page.getByRole('menu',{name:'画布操作'})).toBeVisible();};
+  await context();await page.getByRole('menuitem',{name:'新建情节',exact:true}).click();await page.getByLabel('情节标题',{exact:true}).fill('抵达港口');await page.getByLabel('情节摘要',{exact:true}).fill('独立新情节');await page.locator('.canvas-draft').getByRole('button',{name:'创建',exact:true}).click();
  await expect(page.locator('.planning-card')).toHaveCount(1);await expect(page.locator('.planning-card')).toContainText('抵达港口');
  const scene=(await call('planning.list',{novelId,pageId})).items[0];expect(scene.position.x).toBeGreaterThanOrEqual(32);expect((await call('planning.list',{novelId,pageId:null})).total).toBe(1);
  await context(400,80);await page.getByRole('menuitem',{name:'文字批注',exact:true}).click();let dialog=page.locator('.canvas-draft');
@@ -67,6 +70,8 @@ try{
  await page.evaluate(()=>{document.documentElement.style.cssText='--dsw-alias-bg-base:#20251f;--dsw-alias-label-primary:#e4e8de;--dsw-alias-label-secondary:#a8b0a0;--dsw-alias-border-l1:#404a3b;--dsw-alias-state-success-primary:#a4c195';});await page.setViewportSize({width:1100,height:900});await page.screenshot({path:join(shots,'planning-page-dark.png')});
  await page.getByRole('button',{name:'多选',exact:true}).click();await page.locator('.scene-card').filter({hasText:'抵达港口'}).click();await moveBatch(page,'page:');
  await expect(page.locator('.planning-card')).toHaveCount(2);expect((await call('planning.list',{novelId,pageId})).total).toBe(0);expect((await call('planning.decorations',{novelId,pageId})).total).toBe(2);
+ // Reopen the organization sidebar: canvas creation and settings live there.
+ {const btn=page.getByRole('button',{name:'显示组织侧栏',exact:true});if(await btn.isVisible())await btn.click();}
  await page.getByRole('button',{name:'新建画布',exact:true}).click();dialog=page.getByRole('dialog',{name:'新建画布',exact:true});await dialog.getByLabel('画布名称').fill('临时页');await dialog.getByRole('button',{name:'保存画布'}).click();await page.getByRole('button',{name:'画布设置',exact:true}).click();await page.getByRole('dialog',{name:'画布设置',exact:true}).getByRole('button',{name:'删除空画布',exact:true}).click();
  await expect(page.getByLabel('规划画布',{exact:true})).not.toContainText('临时页');
  expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks:['single manuscript keeps scroll across saves and remote sync','page creation/isolation/rename/reload','right-click scene, styled note, background frame','drag annotation and resize frame persist','annotation conflict retains author draft','narrow context menu and dark screenshots']}));

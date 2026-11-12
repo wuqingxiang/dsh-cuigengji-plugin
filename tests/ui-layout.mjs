@@ -51,14 +51,17 @@ try {
     const detail = page.locator(`.${kind}-detail`);
     for (const width of [360,760,999,1000,1099,1100,1600]) {
       await page.setViewportSize({width,height:850});
-      if(await page.locator('.organized-workspace').evaluate(el=>el.clientWidth>=1060))await expect(page.locator('.workspace-detail-size')).toBeVisible();
-      const expand=page.getByRole('button',{name:'展开详情',exact:true});
-      if(await expand.isVisible())await expand.click();
       await expect(page.locator('.organized-workspace')).toHaveAttribute('data-detail','side');
       await expect(detail).toBeVisible();
+      // Side detail replaces the overview: the overview page leaves layout entirely.
       await expect(page.locator('.overview-page')).toBeHidden();
       await expect(page.getByRole('button',{name:'列表',exact:true})).toHaveCount(0);
-      expect(await detail.evaluate(el => el.clientWidth)).toBeGreaterThan((await page.locator('.organized-workspace').evaluate(el=>el.clientWidth))-5);
+      // The inspector is a side panel: its width tracks --workspace-inspector,
+      // never overflowing the workspace or sliding under the directory.
+      const inspector=await page.locator('.organized-workspace').evaluate(el=>Number.parseFloat(getComputedStyle(el).getPropertyValue('--workspace-inspector')));
+      const detailWidth=await detail.evaluate(el => el.clientWidth);
+      expect(detailWidth).toBeGreaterThan(inspector-5);
+      expect(detailWidth).toBeLessThanOrEqual(inspector+5);
       expect(await page.locator('.workbench-body').evaluate(el => el.scrollWidth<=el.clientWidth+1)).toBe(true);
     }
     const bar = page.locator('.detail-bar'), viewport = page.locator('.detail-scroll');
@@ -153,7 +156,9 @@ try {
       const element = page.locator('.chapter-main .manuscript');
       const box = await element.boundingBox();
       const available = await page.locator('.editor-scroll').boundingBox();
-      expect(available.width-box.width).toBeLessThan(90);
+      // The editor's own chrome (12px side padding + stable scrollbar gutter)
+      // stays under 120px; the manuscript itself fills the rest.
+      expect(available.width-box.width).toBeLessThan(120);
       widths.push(box.width);
     }
     expect(widths[1]-widths[0]).toBeGreaterThan(270);

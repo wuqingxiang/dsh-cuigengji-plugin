@@ -33,6 +33,9 @@ try{
  await page.reload();await button('规划').click();await expect(page.locator('.canvas-folder-folded')).toBeVisible();await button('展开文件夹 主角行动').click();await expect(page.locator('.planning-card')).toHaveCount(7);expect(await read()).toEqual(before);
  // Moving a collapsed folder translates its hidden members once, including after a reload.
  await button('收纳文件夹 主角行动').click();await button('适应视图').click();
+ // The organization sidebar overlays the canvas in 0.6; collapse it so the
+ // folder drag starts on the folder, not on the sidebar chrome.
+ {const btn=page.getByRole('button',{name:'收起组织侧栏',exact:true});if(await btn.isVisible())await btn.click();}
  const folded=page.locator('.canvas-folder-folded'),box=await folded.boundingBox(),matrix=await page.locator('.planning-canvas').evaluate(el=>new DOMMatrixReadOnly(getComputedStyle(el).transform).a),aBefore=await position(tx.mapping.a),bBefore=await position(tx.mapping.b);
  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+48*matrix,box.y+box.height/2+32*matrix,{steps:6});await page.mouse.up();await idle();
  await expect.poll(async()=>Math.round((await position(tx.mapping.a)).x-aBefore.x)).toBe(48);expect(Math.round((await position(tx.mapping.b)).y-bBefore.y)).toBe(32);

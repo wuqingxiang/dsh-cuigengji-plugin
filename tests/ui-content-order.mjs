@@ -114,6 +114,11 @@ try{
   const mixedBefore=(await run('novel.export')).novel.nodes;await dragBefore(memory.character_card[0],memory.world_entry[0]);
   await expect(page.locator('.directory-order-status')).toHaveCount(0);await expect.poll(async()=>{const nodes=await run('graph.list');return nodes.findIndex(n=>n.id===memory.character_card[0])+1===nodes.findIndex(n=>n.id===memory.world_entry[0]);}).toBe(true);
   expect((await run('novel.export')).novel.nodes).toEqual(mixedBefore);
+  // The memory canvas may sit partly under the organization sidebar; collapse
+  // it before the cross-folder drag so the pointer stays on the row grip.
+  // The drag source and target both live in the directory sidebar, which the
+  // collapse hides; drag while it is open but scroll the rows into view.
+  await row(memory.character_card[2]).scrollIntoViewIfNeeded();
   await dragTo(memory.character_card[2],folder(memoryOther.id).locator(':scope>.tree-folder-row .tree-folder-name'),.5);
   await expect.poll(async()=>(await run('graph.get',{nodeId:memory.character_card[2]})).groupId).toBe(memoryOther.id);await expect.poll(coordinates).toEqual(memoryPositions);
   await page.reload();await showOrganization(page);await expect.poll(coordinates).toEqual(memoryPositions);

@@ -55,7 +55,7 @@ export function OrganizedWorkspace({scopeKey, title, count, sidebar, tools, chil
       <div className="workspace-tools">{search&&<button className="workspace-search-toggle" aria-label={search.label} title={search.label} onClick={()=>{setChoice('open');requestAnimationFrame(()=>searchInput.current?.focus({preventScroll:true}));}}><Icon name="search"/></button>}{tools}</div>
     </header>
     <div className="workspace-layout">
-      <div className="workspace-stage"><OverviewPage active>{children}</OverviewPage></div>
+      <div className="workspace-stage"><OverviewPage active={!detail}>{children}</OverviewPage></div>
       {narrow && open && <button className="workspace-sidebar-scrim" aria-label="关闭组织侧栏" onClick={closeSidebar}/>}
       <aside ref={side} style={{width:geometry.directory}} className="workspace-sidebar" aria-label="内容组织" role={narrow?'dialog':undefined} aria-modal={narrow&&open||undefined} hidden={!open} onKeyDown={event=>{
         if(!narrow)return;

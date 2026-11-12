@@ -1,4 +1,5 @@
 import {readFileSync} from 'node:fs';
+import {realpath} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {join, resolve} from 'node:path';
 import {Store} from '../store.js';
@@ -55,6 +56,19 @@ export class UpgradeCoordinator {
   constructor(store: Store, options: {pluginVersion?: string} = {}) {
     this.store = store; this.root = resolve(store.root); this.pluginVersion = options.pluginVersion || packageVersion;
   }
+  /** Windows addresses one directory through several spellings (drive case,
+   * 8.3 short names). resolve() cannot expand short names, so ask the
+   * filesystem for the real path before comparing case-insensitively. */
+  private async sameRoot(left: string, right: string): Promise<boolean> {
+    if (left === right) return true;
+    if (process.platform !== 'win32') return false;
+    if (resolve(left).toLowerCase() === resolve(right).toLowerCase()) return true;
+    const [realLeft, realRight] = await Promise.all([
+      realpath(left).catch(() => null as string | null),
+      realpath(right).catch(() => null as string | null),
+    ]);
+    return realLeft !== null && realRight !== null && realLeft.toLowerCase() === realRight.toLowerCase();
+  }
   private get reportFile() {return join(this.root,'runtime/upgrade.json');}
   private async persist(report: UpgradeReport) {this.report = structuredClone(report); await durableJson(this.reportFile,report);}
   private async detectVersion(): Promise<number> {
@@ -74,7 +88,7 @@ export class UpgradeCoordinator {
       let saved: UpgradeReport | undefined;
       try {saved = await optionalJson(this.reportFile) as UpgradeReport | undefined;}
       catch {return failure('UPGRADE_REPORT_INVALID','升级记录无法解析，原记录已保留；请先检查升级备份');}
-      if (saved && (saved.format !== 'cuigengji-upgrade' || saved.version !== 1 || saved.dataRoot !== this.root || !['ready','running','failed'].includes(saved.status))) return failure('UPGRADE_REPORT_INVALID','升级记录与当前数据目录不匹配');
+      if (saved && (saved.format !== 'cuigengji-upgrade' || saved.version !== 1 || !await this.sameRoot(saved.dataRoot, this.root) || !['ready','running','failed'].includes(saved.status))) return failure('UPGRADE_REPORT_INVALID','升级记录与当前数据目录不匹配');
       const resume = saved?.status === 'running' || saved?.status === 'failed';
       if (resume && saved) report = {...report,startedAt:saved.startedAt,fromStorageVersion:saved.fromStorageVersion,migrated:saved.migrated,
         backupPath:saved.backupPath,backupComplete:saved.backupComplete,beforeStateDigest:saved.beforeStateDigest,

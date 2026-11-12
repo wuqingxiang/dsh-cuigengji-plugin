@@ -1,11 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,readFile,writeFile,mkdir} from 'node:fs/promises';
+import {mkdtemp,rm,readFile,writeFile,mkdir,realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {LibraryService,within} from '../src/application/libraries/service.ts';
 import {workspaceDigest} from '../src/application/maintenance/upgrade.ts';
 import {Store} from '../src/application/store.js';
+
+/** Windows may report a temp path through its 8.3 short spelling; compare
+ * real on-disk paths (case-insensitively on win32) so either form passes. */
+const samePath=async(a,b)=>{
+  const [left,right]=await Promise.all([realpath(a),realpath(b)]).catch(()=>[a,b]);
+  return left===right||(process.platform==='win32'&&left.toLowerCase()===right.toLowerCase());
+};
 
 async function fixture(t){
   const base=await mkdtemp(join(tmpdir(),'cuigengji-library-'));t.after(()=>rm(base,{recursive:true,force:true}));
@@ -18,9 +25,9 @@ test('create and switch keep libraries separate, persist the choice, and keep ol
   const {base,libraries,config,actor}=await fixture(t),store=libraries.proxy('store'),original=store.root;
   const book=await store.dispatch('novel.create',{title:'原目录作品'},actor);
   const target=join(base,'empty'),created=await libraries.change({mode:'create',path:target,confirm:true});
-  assert.equal(created.dataRoot,target);assert.equal(created.changing,false);assert.deepEqual(await store.dispatch('novel.list'),[]);
+  assert.ok(await samePath(created.dataRoot,target));assert.equal(created.changing,false);assert.deepEqual(await store.dispatch('novel.list'),[]);
   await store.dispatch('novel.create',{title:'新目录作品'},actor);
-  assert.equal(config().root,target);assert.deepEqual(config().recent,[target,original]);
+  assert.ok(await samePath(config().root,target));assert.ok((await Promise.all(config().recent.map((p,i)=>samePath(p,i?original:target)))).every(Boolean));
   const restarted=new LibraryService(config().root,{recent:config().recent,persist:async()=>{}});
   assert.equal((await restarted.proxy('store').dispatch('novel.list'))[0].title,'新目录作品');
   await libraries.change({mode:'switch',path:original,confirm:true});

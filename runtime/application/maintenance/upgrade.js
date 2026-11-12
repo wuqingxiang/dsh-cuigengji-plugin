@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { digest, errorCode } from "../../infrastructure/persistence/file-transaction.js";
@@ -53,6 +54,19 @@ class UpgradeCoordinator {
     this.root = resolve(store.root);
     this.pluginVersion = options.pluginVersion || packageVersion;
   }
+  /** Windows addresses one directory through several spellings (drive case,
+   * 8.3 short names). resolve() cannot expand short names, so ask the
+   * filesystem for the real path before comparing case-insensitively. */
+  async sameRoot(left, right) {
+    if (left === right) return true;
+    if (process.platform !== "win32") return false;
+    if (resolve(left).toLowerCase() === resolve(right).toLowerCase()) return true;
+    const [realLeft, realRight] = await Promise.all([
+      realpath(left).catch(() => null),
+      realpath(right).catch(() => null)
+    ]);
+    return realLeft !== null && realRight !== null && realLeft.toLowerCase() === realRight.toLowerCase();
+  }
   get reportFile() {
     return join(this.root, "runtime/upgrade.json");
   }
@@ -93,7 +107,7 @@ class UpgradeCoordinator {
       } catch {
         return failure("UPGRADE_REPORT_INVALID", "\u5347\u7EA7\u8BB0\u5F55\u65E0\u6CD5\u89E3\u6790\uFF0C\u539F\u8BB0\u5F55\u5DF2\u4FDD\u7559\uFF1B\u8BF7\u5148\u68C0\u67E5\u5347\u7EA7\u5907\u4EFD");
       }
-      if (saved && (saved.format !== "cuigengji-upgrade" || saved.version !== 1 || saved.dataRoot !== this.root || !["ready", "running", "failed"].includes(saved.status))) return failure("UPGRADE_REPORT_INVALID", "\u5347\u7EA7\u8BB0\u5F55\u4E0E\u5F53\u524D\u6570\u636E\u76EE\u5F55\u4E0D\u5339\u914D");
+      if (saved && (saved.format !== "cuigengji-upgrade" || saved.version !== 1 || !await this.sameRoot(saved.dataRoot, this.root) || !["ready", "running", "failed"].includes(saved.status))) return failure("UPGRADE_REPORT_INVALID", "\u5347\u7EA7\u8BB0\u5F55\u4E0E\u5F53\u524D\u6570\u636E\u76EE\u5F55\u4E0D\u5339\u914D");
       const resume = saved?.status === "running" || saved?.status === "failed";
       if (resume && saved) report = {
         ...report,
