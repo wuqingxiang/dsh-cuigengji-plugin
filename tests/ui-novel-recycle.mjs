@@ -1,24 +1,13 @@
 // Uses the production UI with synthetic data; never touches a desktop profile.
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','novel-recycle');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs','--welcome'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('novel-recycle');
+const {url,preview}=await startPreview(['--welcome']);
+const call=dispatchCall(url);
 let browser;
 try {
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(new Error('Preview timeout: '+errors)),25000);
-    preview.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exit '+code+': '+errors));});
-    preview.stderr.on('data',chunk=>{errors+=chunk;});
-    preview.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{
-    const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});
-    const value=await response.json();if(!response.ok)throw new Error(value.error);return value;
-  };
   const book=(await call('novel.list'))[0];
   const other=await call('novel.create',{title:'很长的作品名称也应完整显示，不挤走右侧的回收按钮'});
   const extra=await call('novel.create',{title:'仍在写的故事'});

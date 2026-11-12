@@ -1,24 +1,13 @@
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve, join} from 'node:path';
+import {join} from 'node:path';
 import {chromium, expect} from '@playwright/test';
 import {directorySnapshot} from '../src/domain/chapters/order.ts';
+import {startPreview, dispatchCall, shotDir} from './helpers/preview.mjs';
 
-const root = resolve(import.meta.dirname, '..'), shots = join(root, 'test-results', 'chapter-order');
-await mkdir(shots, {recursive: true});
-const preview = spawn(process.execPath, ['scripts/preview-workbench.mjs'], {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
+const shots = await shotDir('chapter-order');
+const {url, preview} = await startPreview();
+const call = dispatchCall(url);
 let browser, page;
 try {
-  const {url} = await new Promise((resolve, reject) => {
-    let output = '', errors = ''; const timer = setTimeout(() => reject(new Error(errors || 'Preview timeout')), 20000);
-    preview.stderr.on('data', chunk => {errors += chunk;});
-    preview.once('exit', code => {clearTimeout(timer); reject(new Error('Preview exit ' + code + errors));});
-    preview.stdout.on('data', chunk => {output += chunk; const line = output.split('\n').find(line => line.startsWith('{')); if (line) {clearTimeout(timer); resolve(JSON.parse(line));}});
-  });
-  const call = async (action, args = {}) => {
-    const response = await fetch(new URL('/dispatch', url), {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({action, args})});
-    const result = await response.json(); if (!response.ok) throw new Error(result.error); return result;
-  };
   const novelId = (await call('novel.list'))[0].id, seed = (await call('chapter.list', {novelId}))[0];
   const volumes = [];
   for (const title of ['第一卷', '第二卷', '空卷']) volumes.push(await call('volume.create', {novelId, title}));

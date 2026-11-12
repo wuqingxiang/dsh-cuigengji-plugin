@@ -1,16 +1,14 @@
-import {spawn} from 'node:child_process';
-import {mkdir,readFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {openAuthorPage} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','presets');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe'],windowsHide:true});
+const shots=await shotDir('presets');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser;
 try {
-  const {url}=await new Promise((resolve,reject)=>{let output='';const timer=setTimeout(()=>reject(new Error('Preview timeout')),20000);preview.once('exit',code=>{clearTimeout(timer);reject(new Error(`Preview exit ${code}`));});preview.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});if(!r.ok)throw new Error(await r.text());return r.json();};
   const novelId=(await call('novel.list'))[0].id;
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1100,height:900}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);

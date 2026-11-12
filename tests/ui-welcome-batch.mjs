@@ -1,25 +1,15 @@
 import {selectSettingsCategory,chooseBatchDestination,moveBatch,batchCommand} from './helpers/navigation.mjs';
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
 import {openAuthorPage,showOrganization} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','welcome-batch');
-await mkdir(shots,{recursive:true});
+const shots=await shotDir('welcome-batch');
 const hosts=[];
 async function preview(flags) {
-  const child=spawn(process.execPath,['scripts/preview-workbench.mjs',...flags],{cwd:root,stdio:['ignore','pipe','pipe']});hosts.push(child);
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(new Error('Preview timeout: '+errors)),25000);
-    child.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exit '+code+': '+errors));});
-    child.stderr.on('data',chunk=>{errors+=chunk;});
-    child.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  return {url,call:async(action,args={})=>{
-    const res=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});
-    const value=await res.json();if(!res.ok)throw new Error(value.error);return value;
-  }};
+  const started=await startPreview(flags);
+  hosts.push(started.preview);
+  return {url:started.url,call:dispatchCall(started.url)};
 }
 let browser,page;
 try {

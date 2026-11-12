@@ -1,22 +1,16 @@
 import {selectPlanningPage,selectedPlanningPage,showOrganization} from './helpers/navigation.mjs';
-import {spawn} from 'node:child_process';
-import {mkdir, readFile} from 'node:fs/promises';
-import {resolve, join} from 'node:path';
+import {join} from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {chromium, expect} from '@playwright/test';
 import {openAuthorPage} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root = resolve(import.meta.dirname, '..'), shots = join(root, 'test-results', 'transfer');
-await mkdir(shots, {recursive: true});
-const server = spawn(process.execPath, ['scripts/preview-workbench.mjs'], {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
+const shots = await shotDir('transfer');
+const {url, preview: server} = await startPreview();
+const call = dispatchCall(url);
 let browser;
 try {
-  const {url} = await new Promise((resolve, reject) => {let output = ''; const timer = setTimeout(() => reject(new Error('Preview timeout')), 20000);
-    server.once('exit', code => {clearTimeout(timer); reject(new Error('Preview exit ' + code));});
-    server.stderr.on('data', chunk => process.stderr.write(chunk));
-    server.stdout.on('data', chunk => {output += chunk; const line = output.split('\n').find(line => line.startsWith('{')); if (line) {clearTimeout(timer); resolve(JSON.parse(line));}});
-  });
-  const call = async (action, args = {}) => {const response = await fetch(new URL('/dispatch', url), {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({action, args})}); if (!response.ok) throw new Error(await response.text()); return response.json();};
   const novelId = (await call('novel.list'))[0].id;
   const volume = await call('volume.create', {novelId, title: '雨城篇'});
   const chapter = await call('chapter.create', {novelId, title: '第二章 码头', volumeId: volume.id, content: '　　码头已经安静下来。\n\n　　她收起了雨伞。'});

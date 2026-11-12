@@ -1,16 +1,13 @@
 // Story workspace visuals in a disposable preview. No desktop profile, real novels or model calls.
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','story');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs','--story-demo'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('story');
+const {url,preview}=await startPreview(['--story-demo']);
+const call=dispatchCall(url);
 let browser;
 try{
- const {url}=await new Promise((done,reject)=>{let output='',errors='';const timeout=setTimeout(()=>reject(new Error(errors||'Preview timeout')),30000);preview.stderr.on('data',v=>errors+=v);preview.once('exit',code=>{clearTimeout(timeout);reject(new Error('Preview exited '+code+errors));});preview.stdout.on('data',v=>{output+=v;const line=output.split('\n').find(v=>v.startsWith('{'));if(line){clearTimeout(timeout);done(JSON.parse(line));}});});
  let calls=0,lastContext=null;
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await r.json();if(!r.ok)throw new Error(result.error);return result;};
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined});
  const page=await browser.newPage({viewport:{width:1280,height:1000},reducedMotion:'reduce'});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
