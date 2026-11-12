@@ -1,0 +1,16 @@
+docs+refactor: store 职责地图注释；重建包含新脚本的客户端产物
+
+store.js（812 行）分析结论与处置：
+- execute() 是有意的单一协调器：跨域动作（正文改→设定过期、
+  预设保存→作品版本）共用同一把锁、同一 touch/version 纪律
+  与 actor 校验；域规则已在 src/domain/*，store 主要是分发
+- 拆分（如抽出 importNovel）需导出约 20 个模块级 helper，
+  收益 -60 行远低于对数据兼容核心区的扰动——改判不拆
+- 在类头新增「Store layout」注释：分区导航（helpers/dispatch/
+  execute 前缀分组/preset-read/importNovel）与新增动作的
+  归位指引（优先下沉到 domain，参照 storyAction 模式）
+
+lib/client.js 重建：上轮 package.json 新增的 8 个 test scripts
+被内嵌进产物（build 读 manifest），补上保持 check:build 一致。
+
+验证：core+startup 22/22、tsc、build、check:build 通过。

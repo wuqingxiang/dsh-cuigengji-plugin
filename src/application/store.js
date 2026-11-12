@@ -145,7 +145,29 @@ function memoryFields(args, novel, creating = false, optionalName = false) {
 }
 
 /** Business commands operate on selectively hydrated project records.
- * Storage owns file partitioning, migration and recoverable batch commits. */
+ * Storage owns file partitioning, migration and recoverable batch commits.
+ *
+ * ── Store layout ────────────────────────────────────────────────────────────
+ * This file is deliberately one coordinator: cross-domain actions (chapter
+ * edits invalidating memory, preset saves touching the novel, story/planning
+ * hand-offs) need the same lock, the same touch/version discipline and the
+ * same actor checks. Domain rules themselves live in src/domain/*.
+ *
+ *   1–146    module helpers: shared validation (text/cas/touch/version),
+ *            memory field assembly and preset persistence
+ *   149–233  Store class core: load/dispatch with request-id idempotency,
+ *            activity recording and save-on-change
+ *   235–688  execute(): the action dispatch table, grouped by prefix —
+ *            guidance/activity/novel/binding → lifecycle → tavern →
+ *            directory moves → planning/story hand-off → chapters →
+ *            graph/edges (memory) → preset → context
+ *   690–747  preset-read snapshotting / context projection / staleness
+ *   749–809  importNovel(): whole-backup validation and identical-import skip
+ *
+ * When adding an action, keep it in its prefix group and prefer moving the
+ * rule body into src/domain/ (see storyAction, planningAction,
+ * memoryGroupAction, variableAction for the pattern).
+ * ───────────────────────────────────────────────────────────────────────── */
 export class Store extends ProjectStore {
   constructor(root, options = {}) {
     super(root, empty, state => {
