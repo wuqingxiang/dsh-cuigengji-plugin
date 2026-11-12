@@ -1,18 +1,16 @@
 import {selectSettingsCategory} from './helpers/navigation.mjs';
 import {selectPlanningPage,selectedPlanningPage,showOrganization,clearCanvasSelection} from './helpers/navigation.mjs';
-import {spawn} from 'node:child_process';
-import {mkdir, writeFile} from 'node:fs/promises';
-import {resolve, join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium, expect} from '@playwright/test';
 import {openAuthorPage} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'), shots=join(root,'test-results','navigation');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('navigation');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page,releaseSave;
 try {
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(new Error(errors||'Preview timeout')),25000);host.stderr.on('data',chunk=>errors+=chunk);host.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exit '+code+errors));});host.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await response.json();if(!response.ok)throw new Error(result.error);return result;};
   const book=(await call('novel.list'))[0],novelId=book.id,chapter=(await call('chapter.list',{novelId}))[0];
   await call('novel.update',{novelId,expectedRevision:book.revision,title:'雾港来信'});
   const second=await call('novel.create',{title:'月亮落在屋顶上'});

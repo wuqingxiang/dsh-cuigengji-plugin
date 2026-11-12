@@ -1,17 +1,15 @@
 // Production UI, real persistence, disposable libraries; no desktop profile or model calls.
-import {spawn} from 'node:child_process';
-import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,selectSettingsCategory} from './helpers/navigation.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','library-tree'),scratch=await mkdtemp(join(tmpdir(),'cuigengji-ui-libraries-'));
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs','--canvas-demo'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('library-tree'),scratch=await mkdtemp(join(tmpdir(),'cuigengji-ui-libraries-'));
+const {url,dataDirectory,preview:host}=await startPreview(['--canvas-demo']);
+const call=dispatchCall(url);
 let browser,page;
 try{
-  const {url,dataDirectory}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',part=>errors+=part);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',part=>{output+=part;const line=output.split('\n').find(row=>row.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await response.json();if(!response.ok)throw Error(result.error);return result;};
   const novel=(await call('novel.list'))[0],novelId=novel.id,plan=(await call('planning.list',{novelId,pageId:null})).items[0];
   if(!plan.groupId){const group=await call('planning.group.create',{novelId,name:'主线事件',requestId:crypto.randomUUID()});await call('planning.apply',{novelId,requestId:crypto.randomUUID(),operations:[{op:'node.update',id:plan.id,expectedRevision:plan.revision,value:{groupId:group.id}}]});plan.groupId=group.id;}
   browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});

@@ -1,16 +1,14 @@
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,selectPlanningPage,selectedPlanningPage,selectSettingsCategory} from './helpers/navigation.mjs';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','unified-workspace');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs','--canvas-demo'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('unified-workspace');
+const {url,preview:host}=await startPreview(['--canvas-demo']);
+const call=dispatchCall(url);
 let browser,page;
 try {
-  const {url}=await new Promise((resolve,reject)=>{let text='',errors='';const timer=setTimeout(()=>reject(new Error(errors||'Preview timeout')),25000);host.stderr.on('data',chunk=>errors+=chunk);host.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exit '+code+errors));});host.stdout.on('data',chunk=>{text+=chunk;const line=text.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await response.json();if(!response.ok)throw new Error(result.error);return result;};
   const novelId=(await call('novel.list'))[0].id,originalBinding=await call('binding.get');
   const main=(await call('planning.list',{novelId,pageId:null})).items,pages=await call('planning.pages',{novelId}),groups=await call('planning.groups',{novelId});
   browser=await chromium.launch({headless:true});page=await browser.newPage({viewport:{width:600,height:920},reducedMotion:'reduce'});

@@ -1,14 +1,11 @@
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 import {chromium,expect} from '@playwright/test';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','author-workflow');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('author-workflow');
+const {url,preview}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;
 try{
- const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(new Error(errors||'Preview timeout')),20000);preview.stderr.on('data',v=>errors+=v);preview.once('exit',code=>{clearTimeout(timer);reject(new Error('Preview exit '+code+errors));});preview.stdout.on('data',v=>{output+=v;const line=output.split('\n').find(v=>v.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
- const call=async(action,args={})=>{const r=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});const result=await r.json();if(!r.ok)throw new Error(result.error);return result;};
  const novelId=(await call('novel.list'))[0].id,first=(await call('chapter.list',{novelId}))[0];
  const prose='雨夜里的脚步声越走越近。\n\n'.repeat(80);
  await call('chapter.update',{novelId,chapterId:first.id,expectedRevision:first.revision,content:prose});
@@ -41,7 +38,8 @@ try{
  await expect.poll(async()=>(await call('chapter.get',{novelId,chapterId:first.id})).deleted).toBe(false);
  expect((await call('chapter.get',{novelId,chapterId:first.id})).content).toBe(prose+'删除前最后输入的正文。');
  await page.getByRole('button',{name:'移入回收站 第一章 雨夜来客',exact:true}).click();
- await expect(page.locator('.chapter-item').filter({hasText:'第一章 雨夜来客'})).toHaveCount(0);
+ // The directory may poll-refresh a moment after the RPC confirms deletion.
+ await expect(page.locator('.chapter-item').filter({hasText:'第一章 雨夜来客'})).toHaveCount(0,{timeout:10000});
  await page.getByRole('button',{name:/^回收站/}).click();
  // The recycled row keeps the same title; restore from that row.
  const recycledRow=page.locator('.chapter-item').filter({hasText:'第一章 雨夜来客'});

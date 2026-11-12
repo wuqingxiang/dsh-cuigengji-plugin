@@ -1,31 +1,14 @@
 import {selectPlanningPage,selectedPlanningPage,showOrganization} from './helpers/navigation.mjs';
 // Exercise screen transitions against a disposable production UI/Store preview.
-import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
-import {resolve, join} from 'node:path';
+import {join} from 'node:path';
 import {chromium, expect} from '@playwright/test';
+import {startPreview, dispatchCall, shotDir} from './helpers/preview.mjs';
 
-const root = resolve(import.meta.dirname, '..');
-const preview = spawn(process.execPath, ['scripts/preview-workbench.mjs'], {cwd:root, stdio:['ignore','pipe','pipe']});
+const screenshots = await shotDir('detail-layout');
+const {url, preview} = await startPreview();
+const call = dispatchCall(url);
 let browser;
 try {
-  const {url} = await new Promise((resolve, reject) => {
-    let output = '', errors = '';
-    const timeout = setTimeout(() => reject(new Error('Preview startup timed out')), 20000);
-    preview.stderr.on('data', chunk => {errors += chunk;});
-    preview.once('exit', code => {clearTimeout(timeout); reject(new Error(`Preview exited ${code}: ${errors}`));});
-    preview.stdout.on('data', chunk => {
-      output += chunk;
-      const line = output.split('\n').find(line => line.startsWith('{'));
-      if (line) {try {const result = JSON.parse(line);clearTimeout(timeout);resolve(result);} catch {}}
-    });
-  });
-  const call = async (action, args={}) => {
-    const response = await fetch(new URL('/dispatch', url), {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({action,args})});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
-    return result;
-  };
   const novelId = (await call('novel.list'))[0].id;
   const prose = Array.from({length:40}, (_, i) => `第 ${i+1} 段。${'雨停之后，街上的行人渐渐多了起来。她将信收进口袋，回头看了一眼灯火未熄的书铺。'.repeat(3)}`).join('\n\n');
   const chapter = (await call('chapter.list',{novelId}))[0];
@@ -43,8 +26,6 @@ try {
   const page = await browser.newPage({viewport:{width:900,height:850},reducedMotion:'reduce'});
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  const screenshots = join(root,'test-results','detail-layout');
-  await mkdir(screenshots,{recursive:true});
   await page.goto(url);
   const geometry = locator => locator.evaluate(el => ({top:el.scrollTop,left:el.scrollLeft}));
   const verifyDetail = async (kind, editLabel) => {
@@ -169,7 +150,7 @@ try {
   console.log(JSON.stringify({ok:true,checks:['detail isolation through seven panel widths','fixed back/edit controls','list position, filters and focus restored','both graph zoom and scroll restored','related entry back trail preserves drafts','single manuscript grows with panel']}));
 } catch (error) {
   const page=browser?.contexts()[0]?.pages()[0];
-  if(page){await page.screenshot({path:join(root,'test-results','detail-layout','failure.png')});console.error((await page.locator('body').innerText()).slice(0,1600));}
+  if(page){await page.screenshot({path:join(screenshots,'failure.png')});console.error((await page.locator('body').innerText()).slice(0,1600));}
   throw error;
 } finally {
   await browser?.close();

@@ -1,17 +1,15 @@
 // Real canvas, pointer interactions and image export with disposable story data.
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import {showOrganization,clearCanvasSelection} from './helpers/navigation.mjs';
 import {clickWire} from './helpers/graph.mjs';
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results/canvas-junctions');
-await mkdir(shots,{recursive:true});
-const host=spawn(process.execPath,['scripts/preview-workbench.mjs'],{cwd:root,stdio:['ignore','pipe','pipe']});
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
+const shots=await shotDir('canvas-junctions');
+const {url,preview:host}=await startPreview();
+const call=dispatchCall(url);
 let browser,page;const checks=[];
 try{
-  const {url}=await new Promise((resolve,reject)=>{let output='',errors='';const timer=setTimeout(()=>reject(Error(errors||'Preview timeout')),25000);host.stderr.on('data',chunk=>errors+=chunk);host.once('exit',()=>{clearTimeout(timer);reject(Error(errors));});host.stdout.on('data',chunk=>{output+=chunk;const line=output.split('\n').find(row=>row.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});});
-  const call=async(action,args={})=>{const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})}),value=await response.json();if(!response.ok)throw Error(value.error);return value;};
   const novelId=(await call('novel.list'))[0].id,run=(action,args={})=>call(action,{novelId,...args});
   const specs=[['source','发现密信',0,210],['a','追查寄信人',320,210],['b','先保护证人',320,500],['end','码头会合',640,210]];
   const links=[['source','a','next'],['source','b','alternative'],['a','end','next'],['b','end','next']];

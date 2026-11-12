@@ -112,13 +112,14 @@ try{
   const mixedBefore=(await run('novel.export')).novel.nodes;await dragBefore(memory.character_card[0],memory.world_entry[0]);
   await expect(page.locator('.directory-order-status')).toHaveCount(0);await expect.poll(async()=>{const nodes=await run('graph.list');return nodes.findIndex(n=>n.id===memory.character_card[0])+1===nodes.findIndex(n=>n.id===memory.world_entry[0]);}).toBe(true);
   expect((await run('novel.export')).novel.nodes).toEqual(mixedBefore);
-  // The memory canvas may sit partly under the organization sidebar; collapse
-  // it before the cross-folder drag so the pointer stays on the row grip.
-  // The drag source and target both live in the directory sidebar, which the
-  // collapse hides; drag while it is open but scroll the rows into view.
+  // The memory canvas may sit partly under the organization sidebar; the drag
+  // source and target both live in the directory sidebar. Scroll both rows
+  // fully into view before the gesture; under parallel load the first poll
+  // may observe the pre-move group, so allow the standard poll window.
   await row(memory.character_card[2]).scrollIntoViewIfNeeded();
+  await folder(memoryOther.id).locator(':scope>.tree-folder-row .tree-folder-name').scrollIntoViewIfNeeded();
   await dragTo(memory.character_card[2],folder(memoryOther.id).locator(':scope>.tree-folder-row .tree-folder-name'),.5);
-  await expect.poll(async()=>(await run('graph.get',{nodeId:memory.character_card[2]})).groupId).toBe(memoryOther.id);await expect.poll(coordinates).toEqual(memoryPositions);
+  await expect.poll(async()=>(await run('graph.get',{nodeId:memory.character_card[2]})).groupId,{timeout:15000}).toBe(memoryOther.id);await expect.poll(coordinates).toEqual(memoryPositions);
   await page.reload();await showOrganization(page);await expect.poll(coordinates).toEqual(memoryPositions);
   await dragToRoot(memory.character_card[2],page.getByLabel('设定文件夹',{exact:true}));await expect.poll(async()=>(await run('graph.get',{nodeId:memory.character_card[2]})).groupId??null).toBe(null);await expect.poll(coordinates).toEqual(memoryPositions);
   await button('多选').click();await row(looseCharacter.id).getByRole('checkbox').check();await expect(page.locator('.batch-toolbar [role=status]')).toHaveText('已选 1 项');await button('完成').click();

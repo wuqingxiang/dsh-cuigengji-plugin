@@ -1,22 +1,13 @@
-import {spawn} from 'node:child_process';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
+import {writeFile} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
+import {startPreview,dispatchCall,shotDir} from './helpers/preview.mjs';
 
-const root=resolve(import.meta.dirname,'..'),shots=join(root,'test-results','manuscript-search');
-await mkdir(shots,{recursive:true});
-const preview=spawn(process.execPath,['scripts/preview-workbench.mjs','--sidebar-host'],{cwd:root,stdio:['ignore','pipe','pipe']});
+const shots=await shotDir('manuscript-search');
+const {url,preview}=await startPreview(['--sidebar-host']);
+const call=dispatchCall(url);
 let browser,page;
 try {
-  const {url}=await new Promise((resolve,reject)=>{
-    let output='',errors='';const timer=setTimeout(()=>reject(new Error(errors||'Preview timeout')),20000);
-    preview.stderr.on('data',data=>{errors+=data;});preview.once('exit',code=>{clearTimeout(timer);reject(new Error(`Preview exit ${code}: ${errors}`));});
-    preview.stdout.on('data',data=>{output+=data;const line=output.split('\n').find(line=>line.startsWith('{'));if(line){clearTimeout(timer);resolve(JSON.parse(line));}});
-  });
-  const call=async(action,args={})=>{
-    const response=await fetch(new URL('/dispatch',url),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,args})});
-    const result=await response.json();if(!response.ok)throw new Error(result.error);return result;
-  };
   const novelId=(await call('novel.list'))[0].id,a=(await call('chapter.list',{novelId}))[0];
   const first='雨声。雨声。Cat CAT cat。\n'+Array.from({length:100},(_,i)=>`第${i+1}段。她将来信放好，点亮窗边的灯。`).join('\n')+'\n远处仍有雨声。';
   await call('chapter.update',{novelId,chapterId:a.id,expectedRevision:a.revision,content:first});
