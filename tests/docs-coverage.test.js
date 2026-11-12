@@ -69,6 +69,12 @@ test('docs reference only existing images, and feature screenshots stay out of t
   assert.deepEqual(stray, [], 'unreferenced images in docs/screenshots are promo material; move them to .github/assets');
 });
 
+test('install guide states the shipped version and floor it declares', async () => {
+  const guide = await readFile(join(root, 'docs', 'getting-started.md'), 'utf8');
+  assert.ok(guide.includes(`dsh-cuigengji-plugin@${pkg.version}`), 'install guide must name the shipped version');
+  assert.ok(guide.includes(pkg.engines.dsh.replace(/^>=/, '')), 'install guide must state the declared DSH floor');
+});
+
 test('every public doc under docs/ is reachable from docs/README.md (AGENTS.md entry-point rule)', async () => {
   const index = await readFile(join(root, 'docs', 'README.md'), 'utf8');
   const orphans = (await readdir(join(root, 'docs')).catch(() => []))
