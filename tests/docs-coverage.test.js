@@ -48,3 +48,23 @@ test('every test:* script is discoverable from the verification docs', async () 
     .filter(s => !allDocs.includes(`\`${s}\``));
   assert.deepEqual(orphans, [], 'test scripts exist that no public doc mentions');
 });
+
+test('docs reference only existing images, and feature screenshots stay out of the promo area', async () => {
+  const referenced = new Set();
+  for (const doc of docFiles) {
+    const text = await readFile(join(root, doc), 'utf8');
+    for (const m of text.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) referenced.add(m[1]);
+    for (const m of text.matchAll(/\]\(([^)]+\.(?:png|jpg|jpeg|gif|webp|svg))\)/g)) referenced.add(m[1]);
+  }
+  const broken = [];
+  for (const ref of referenced) {
+    if (/^(https?:|mailto:)/.test(ref)) continue;
+    await readFile(resolve(root, ref)).catch(() => broken.push(ref));
+  }
+  assert.deepEqual(broken, [], 'docs embed images that do not exist');
+  // docs/screenshots holds real feature captures referenced by the docs;
+  // promotional material belongs under .github/assets (AGENTS.md).
+  const stray = (await readdir(join(root, 'docs', 'screenshots')).catch(() => []))
+    .filter(name => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(name) && !referenced.has(`docs/screenshots/${name}`));
+  assert.deepEqual(stray, [], 'unreferenced images in docs/screenshots are promo material; move them to .github/assets');
+});
